@@ -19,13 +19,17 @@ Comprehensive profiling of deep learning / matrix workloads using **PyTorch Prof
 
 ## 📊 Experimental Evidence & Profiler Traces
 
-### 1. Baseline Workload Execution
-In baseline mode, host memory is pageable and operations are strictly serialized in the default stream.
-![Baseline Run](results/Screenshot%202026-11-24%20101839.png)
+### 1. Initial Baseline Test Verification
+Smoke testing the baseline execution configuration with a small batch count before full profiling:
+![Initial Baseline Test Run](results/01_initial_baseline_test_run.png)
 
-### 2. Trace Analysis & Idle Gap Detection
-PyTorch trace analyzer reveals that data transfer accounts for the majority of execution time, leaving the GPU idle for **24.96 ms** across 9 idle gaps with only **17.2% GPU utilization**:
-![Baseline Trace Analysis](results/Screenshot%202026-11-24%20101856.png)
+### 2. Baseline Workload Execution with Profiler Enabled
+In baseline mode, host memory is pageable and all operations (H2D copy, compute kernels, D2H copy) run strictly sequentially in the default stream:
+![Baseline Profile Run](results/02_baseline_profile_run.png)
+
+### 3. Trace Analysis & Idle Gap Breakdown
+The profiler trace analyzer parses the recorded trace JSON and reveals severe host-device memory transfer overheads, leaving the GPU compute engine idle for **24.96 ms** across 9 idle gaps with only **17.2% GPU utilization**:
+![Baseline Trace Analysis and Idle Gaps](results/03_baseline_trace_analysis_idle_gaps.png)
 
 * **Profiled Window:** 37.92 ms
 * **Kernel Busy Time:** 6.53 ms
@@ -34,11 +38,11 @@ PyTorch trace analyzer reveals that data transfer accounts for the majority of e
 * **Copy Overlapped with Kernel:** 0.00 ms
 * **Idle Gaps > 50 µs:** 9 gaps (total 24.96 ms)
 
-### 3. Optimized Execution (Overlapped Copy & Compute)
+### 4. Optimized Execution (Overlapped Copy & Compute)
 By enabling pinned host memory (`.pin_memory()`) and two CUDA streams (`copy_s` and `comp_s`) with double-buffering synchronization:
-![Optimized Run](results/Screenshot%202026-11-24%20101903.png)
+![Optimized CUDA Streams Execution](results/04_optimized_cuda_streams_run.png)
 
-* **Per Batch Latency:** Dropped from **3.30 ms** down to **1.30 ms**
+* **Per-Batch Latency:** Dropped from **3.30 ms** down to **1.30 ms**
 * **Throughput:** Jumped from **302.8 batches/s** to **767.1 batches/s**
 * **Checksum:** Matches precisely (`1.006320e+08`)
 
@@ -78,6 +82,10 @@ $$\text{Arithmetic Intensity (AI)} = \frac{\text{FLOPs performed}}{\text{Bytes m
 ├── gpu_workload.py     # Workload benchmark supporting baseline & optimized modes
 ├── requirements.txt    # Python dependencies
 ├── results/            # Benchmark outputs and trace analyzer screenshots
+│   ├── 01_initial_baseline_test_run.png
+│   ├── 02_baseline_profile_run.png
+│   ├── 03_baseline_trace_analysis_idle_gaps.png
+│   └── 04_optimized_cuda_streams_run.png
 └── README.md           # Project documentation and performance report
 ```
 
